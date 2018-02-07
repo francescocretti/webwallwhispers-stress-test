@@ -48,7 +48,7 @@ BufferLoader.prototype.load = function () {
 };
 
 // *********************************************************
-/** ACTION SOUND CONSTRUCTOR
+/** Buffered SOUND CONSTRUCTOR
  * @param {Object} AudioContext
  *			WebAudio Context of current application
  *
@@ -56,7 +56,7 @@ BufferLoader.prototype.load = function () {
  *			Actual array buffer with decoded audio data
  *
  **/
-function ActionSound(audioContext, bufferSource, idx, HTMLlog, debugLog) {
+function BufferedSound(audioContext, bufferSource, idx, HTMLlog, debugLog) {
 	this.context = audioContext;
   this.buffer = bufferSource;
 	this.index = idx;
@@ -65,6 +65,7 @@ function ActionSound(audioContext, bufferSource, idx, HTMLlog, debugLog) {
 	this.sourceNode = '';
   this.masterGain = '';
   this.playing = false;
+	this.fading = false;
 	this.loop = false;
 	this.reverberator = new Reverberator(audioContext, this);
 	this.filter = new Filter(audioContext, this);
@@ -72,14 +73,14 @@ function ActionSound(audioContext, bufferSource, idx, HTMLlog, debugLog) {
 	this.binauralizator = new Binauralizator (audioContext, this);
 }
 
-ActionSound.prototype.init = function () {
+BufferedSound.prototype.init = function () {
 	this.masterGain = this.context.createGain();
 	this.masterGain.connect(this.context.destination);
 	this.masterGain.gain.setTargetAtTime(1, this.context.currentTime, 0.5);
-	console.log('ACTION SOUND INIT');
+	console.log('Buffered SOUND INIT');
 };
 
-ActionSound.prototype.play = function () {
+BufferedSound.prototype.play = function () {
 	if (!this.playing) {
 		this.sourceNode = this.context.createBufferSource();
 		this.sourceNode.loop = this.loop;
@@ -87,33 +88,33 @@ ActionSound.prototype.play = function () {
 		this.sourceNode.start(0);
 		this.sourceNode.connect(this.masterGain);
 		this.playing = true;
-		this.dLog && console.log(`Action sound ID: ${this.index} - Play`);
-		this.htmlLogger.innerHTML += '<br>Played action sound ID: ' + this.index;
+		this.dLog && console.log(`Buffered sound ID: ${this.index} - Play`);
+		this.htmlLogger.innerHTML += '<br>Played Buffered sound ID: ' + this.index;
 	} else {
 		// this.dLog && console.log('Already playing. Check gain value');
 	}
 };
 
-ActionSound.prototype.stop = function () {
+BufferedSound.prototype.stop = function () {
 	if (this.playing) {
 		this.sourceNode.stop(0);
 		this.sourceNode.disconnect(this.masterGain); // disconnect from any source
 		this.playing = false;
-		this.dLog && console.log(`Action sound ID: ${this.index} - stopped`);
-		this.htmlLogger.innerHTML += '<br>Stopped action sound <ID: ' + this.index + '> ';
+		this.dLog && console.log(`Buffered sound ID: ${this.index} - stopped`);
+		this.htmlLogger.innerHTML += '<br>Stopped Buffered sound <ID: ' + this.index + '> ';
 	}
 };
 
-ActionSound.prototype.setLoop = function (loop) {
+BufferedSound.prototype.setLoop = function (loop) {
 	const self = this;
 	// Sets loop when starts playing
 	self.loop = loop;
 	// Useful when already playing
 	self.sourceNode.loop = loop;
-	self.dLog && console.log(`Action sound ID: ${this.index} - loop set to ${loop}`);
+	self.dLog && console.log(`Buffered sound ID: ${this.index} - loop set to ${loop}`);
 };
 
-ActionSound.prototype.fire = function () {
+BufferedSound.prototype.fire = function () {
 	const self = this;
 	this.masterGain.gain.setValueAtTime(1, this.context.currentTime);
 	var dur = self.buffer.duration;
@@ -127,57 +128,110 @@ ActionSound.prototype.fire = function () {
 		self.sourceNode.disconnect(); // disconnect from any source
 		self.playing = false;
 	}, dur * 1000);
-	self.dLog && console.log(`Action sound ID: ${this.index} - fired!`);
+	self.dLog && console.log(`Buffered sound ID: ${this.index} - fired!`);
 };
 
 /**
- * @param {Number} secs
+ * @param {Number} fadeTime
  *			Duration of fade in seconds
  **/
-ActionSound.prototype.fadeIn = function (secs) {
-	if (!secs) {
+BufferedSound.prototype.fadeIn = function (fadeTime) {
+	if (!fadeTime) {
 		this.dLog && console.warn(`Missing argument fadeTime. Set to 1 second`);
-		secs = 1;
+		fadeTime = 1;
 	}
-	if (!this.playing) {
-		this.masterGain.gain.setValueAtTime(0, this.context.currentTime);
-		this.play();
-		this.masterGain.gain.linearRampToValueAtTime(1, this.context.currentTime + secs);
-		this.htmlLogger.innerHTML += '<br>Action sound fading in <ID: ' + this.index + '>... ';
-	} else {
-		// this.dLog && console.log("Already playing. Check gain value.");
-	}
-};
-
-/**
- * @param {Number} secs
- *			Duration of fade in seconds
- **/
-ActionSound.prototype.fadeOut = function (secs) {
-	if (!secs) {
-		this.dLog && console.warn(`Missing argument fadeTime. Set to 1 second`);
-		secs = 1;
-	}
-	if (this.playing) {
-		const self = this;
-		self.masterGain.gain.setValueAtTime(self.masterGain.gain.value, self.context.currentTime);
-		self.masterGain.gain.linearRampToValueAtTime(0.0001, self.context.currentTime + secs);
-		this.htmlLogger.innerHTML += '<br>Action sound fading out <ID: ' + this.index + '>... ';
+	const self = this;
+	if (!self.playing) {
+		var curTime = self.context.currentTime;
+		self.masterGain.gain.setValueAtTime(0, curTime);
+		// set automation points fot fade in
+		for (var i = 0; i <= fadeTime; i += 0.1) {
+			var x = i / fadeTime;
+			var value = Math.cos((1.0 - x) * 0.5 * Math.PI);
+			self.masterGain.gain.linearRampToValueAtTime(value, curTime + i);
+		}
+		self.play();
+		self.fading = true;
+		self.htmlLogger.innerHTML += '<br>Buffered sound fading in <ID: ' + this.index + '>... ';
 		setTimeout(function () {
-			self.stop();
-		}, secs * 1000);
+			self.fading = false;
+			this.dLog && console.log(`Fade in stream finished [ ID: ${self.index} ]`);
+			self.htmlLogger.innerHTML += '<br>Fade in stream finished [ID: ' + self.index + '] ';
+		}, fadeTime * 1000);
+	} else {
+		this.dLog && console.log(`Cannot fade in. Already playing [ ID: ${self.index} ]`);
 	}
 };
 
-ActionSound.prototype.mute = function () {
+/**
+ * @param {Number} fadeTime
+ *			Duration of fade in seconds
+ **/
+ BufferedSound.prototype.fadeOut = function (fadeTime) {
+ 	if (!fadeTime) {
+ 		this.dLog && console.warn(`Missing argument fadeTime. Set to 1 second`);
+ 		fadeTime = 1;
+ 	}
+ 	const self = this;
+ 	if (self.playing) {
+ 		var currGain = self.masterGain.gain.value;
+ 		var curTime = self.context.currentTime;
+ 		self.masterGain.gain.setValueAtTime(currGain, curTime);
+ 		for (var i = 0; i <= fadeTime; i += 0.1) {
+ 			var x = i / fadeTime;
+ 			var value = Math.cos(x * 0.5 * Math.PI) * currGain;
+ 			self.masterGain.gain.linearRampToValueAtTime(value, curTime + i);
+ 		}
+ 		self.fading = true;
+ 		this.dLog && console.log(`Fading out buffered sound [ ID: ${self.index} ]`);
+ 		this.htmlLogger.innerHTML += '<br>Buffered sound fading out <ID: ' + this.index + '>... ';
+ 		setTimeout(function () {
+ 			self.stop();
+ 			self.fading = false;
+ 			this.dLog && console.log(`Fade out buffered sound finished [ ID: ${self.index} ]`);
+ 			self.htmlLogger.innerHTML += '<br>Fade out buffered sound finished [ID: ' + self.index + '] ';
+ 		}, fadeTime * 1000);
+ 	}
+ };
+
+/**
+ * @returns {Boolean}
+ *			If stream is currently fading
+ **/
+BufferedSound.prototype.isFading = function () {
+	return this.fading;
+};
+
+
+BufferedSound.prototype.mute = function () {
 		this.masterGain.gain.cancelScheduledValues(this.context.currentTime);
 		this.masterGain.gain.setValueAtTime(0, this.context.currentTime);
-		this.dLog && console.log(`Action sound ID: ${this.index} muted`);
-		this.htmlLogger.innerHTML += '<br>Action sound muted ID: ' + this.index;
+		this.dLog && console.log(`Buffered sound ID: ${this.index} muted`);
 };
 
-ActionSound.prototype.unmute = function () {
+BufferedSound.prototype.unmute = function () {
 		this.masterGain.gain.setValueAtTime(1, this.context.currentTime);
+		this.dLog && console.log(`Buffered sound ID: ${this.index} unmuted`);
+};
+
+/**
+ *
+ * @param {Number} mgain
+ *			Gain value of master  signal
+ **/
+BufferedSound.prototype.setMasterGain = function (mgain) {
+	if (mgain > 1) {
+		this.dLog && console.warn('Gain values cannot be greater than 1');
+		mgain = 1;
+	} else if (mgain < 0) {
+		this.dLog && console.warn('Gain values cannot be lower than 0');
+		mgain = 0;
+	}
+	this.masterGain.gain.setTargetAtTime(mgain, this.context.currentTime, 0.5);
+};
+
+BufferedSound.prototype.getMasterGain = function () {
+	return this.masterGain.gain.value;
 };
 
 /**
@@ -188,7 +242,7 @@ ActionSound.prototype.unmute = function () {
  * @param {Number} secs
  *			Duration of fade in seconds
  **/
-ActionSound.prototype.fadeToGain = function (val, secs) {
+BufferedSound.prototype.fadeToGain = function (val, secs) {
 		if (val > 1) {
 			this.dLog && console.warn('Gain values cannot be greater than 1');
 			val = 1;
@@ -225,7 +279,6 @@ function StreamSound(audioContext, idx, HTMLlog, debugLog) {
 	this.binauralizator = new Binauralizator(audioContext, this);
 	this.filter = new Filter (audioContext, this);
 	this.distortion = new Distortion (audioContext, this);
-	this.outputNode = '';
 }
 
 /**
@@ -249,7 +302,6 @@ StreamSound.prototype.init = function (autoStart) {
 	self.masterGain = self.context.createGain();
 	self.sourceNode.connect(self.masterGain);
 	self.masterGain.connect(self.context.destination);
-	this.outputNode = this.masterGain;
 	self.audioElement.pause();
 	// this.dLog && console.log(`Stream Sound ${self.index} loaded with Hls`);
 	self.hls.on(Hls.Events.FRAG_PARSING_INIT_SEGMENT, function () {
@@ -747,7 +799,7 @@ Reverberator.prototype.addReverb = function (wgain) {
 
 /**
  * @param {Object} sound
- *			Sound object to remove reverb from (can be ActionSound or StreamSound)
+ *			Sound object to remove reverb from (can be BufferedSound or StreamSound)
  * @returns {Boolean}
  *			True if reverb removed / False if not
  **/
@@ -830,7 +882,7 @@ Reverberator.prototype.fadeOutReverb = function (secs) {
   *			True if binaural added / False if already present
   **/
 Binauralizator.prototype.makeBinaural = function () {
-	if (this.parent instanceof StreamSound) {
+	if (this.parent instanceof StreamSound || this.parent instanceof BufferedSound) {
 		if (!this.binauralized) {
 			// create convolver node
 			this.binauralFIRNode = new BinauralFIR({
@@ -859,7 +911,7 @@ Binauralizator.prototype.makeBinaural = function () {
 			return false;
 		}
 	} else {
-		this.parent.dLog && console.error('ERROR: wrong sound type in Binauralizator (only StreamSound accepted)');
+		this.parent.dLog && console.error('ERROR: wrong sound type in Binauralizator');
 	}
 };
 

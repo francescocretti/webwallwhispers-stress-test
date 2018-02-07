@@ -1,5 +1,5 @@
 {
-  "debugLogs": false,
+  "debugLogs": true,
   "audio": {
     "hlsStreamNumber": 6,
     "preloadHls": [true, true, true, true, true, true]
