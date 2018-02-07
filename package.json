@@ -1,0 +1,26 @@
+{
+  "name": "spls_demo_v1.0",
+  "version": "1.0.0",
+  "description": "SPLS Web App Demo versione 1.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://francescocretti@bitbucket.org/splsteam/splswebapp.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "homepage": "https://bitbucket.org/splsteam/splswebapp#readme",
+  "devDependencies": {
+    "eslint": "^4.11.0",
+    "eslint-config-airbnb-base": "^12.1.0",
+    "eslint-plugin-import": "^2.8.0"
+  },
+  "dependencies": {
+    "eslint": "^4.11.0",
+    "eslint-plugin-import": "^2.8.0"
+  }
+}
