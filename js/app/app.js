@@ -657,6 +657,7 @@ var splsApp = splsApp === undefined ? {} : splsApp;
           }
         });
         id = `s100s${index+1}d`;
+        console.log(id);
         document.getElementById(id).addEventListener('click', function () {
           var sound = el;
           if (!sound.distortion.distorted) {
