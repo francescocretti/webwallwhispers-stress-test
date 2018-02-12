@@ -67,7 +67,8 @@ function BufferedSound(audioContext, bufferSource, idx, HTMLlog, debugLog) {
   this.playing = false;
 	this.fading = false;
 	this.loop = false;
-	this.reverberator = new Reverberator(audioContext, this);
+	this.reverb = false;
+  this.reverberator = '';
 	this.filter = new Filter(audioContext, this);
 	this.distortion = new Distortion (audioContext, this);
 	this.binauralizator = new Binauralizator (audioContext, this);
@@ -461,6 +462,97 @@ StreamSound.prototype.startFragmentsLoading = function () {
 	}
 };
 
+
+/**
+ *
+ * @param {Object} rvb
+ *			Reverberator object to connect to
+ *
+ * @param {Number} wgain
+ *			Gain value of wet signal
+ *
+ * @returns {Boolean}
+ *			True if reverb added / Flase if already present
+ **/
+BufferedSound.prototype.addReverb = function (rvb, wgain) {
+	const self = this;
+	if (!self.reverb) {
+		if (wgain > 1) {
+			self.dLog && console.warn('Gain values cannot be greater than 1');
+			wgain = 1;
+		} else if (wgain < 0) {
+			self.dLog && console.warn('Gain values cannot be lower than 0');
+			wgain = 0;
+		}
+		self.reverberator = rvb;
+		// create gain node for adjusting wet signal
+		self.wetGain = self.context.createGain();
+		self.wetGain.gain.setTargetAtTime(wgain, self.context.currentTime, 0.5);
+		// Do connections
+		self.masterGain.connect(self.wetGain);
+		self.wetGain.connect(self.reverberator.convolver);
+		self.reverb = true;
+		self.dLog && console.log(`Reverb added [ID: ${self.index}]`);
+		return true;
+	} else {
+		self.dLog && console.warn(`Reverb already present [ID: ${self.index}]`);
+		return false;
+	}
+};
+
+/**
+ * @param {Object} sound
+ *			Sound object to remove reverb from (can be ActionSound or StreamSound)
+ * @returns {Boolean}
+ *			True if reverb removed / False if not
+ **/
+BufferedSound.prototype.removeReverb = function () {
+		if (this.reverb) {
+			this.masterGain.disconnect(this.wetGain);
+			this.wetGain.disconnect(this.reverberator.convolver);
+			this.dLog && console.log(`Reverb removed [ID: ${this.index}]`);
+			this.reverb = false;
+			return true;
+		} else {
+			this.dLog && console.warn(`Use addReverb() before trying to remove it [ID: ${this.index}]`);
+			return false;
+		}
+};
+
+/**
+ * @param {Number} wgain
+ *			Gain value for wet signal
+ **/
+BufferedSound.prototype.setWetGain = function (wgain) {
+	if (this.reverb) {
+		this.wetGain.gain.setTargetAtTime(wgain, this.context.currentTime, 0.5);
+	} else {
+		this.dLog && console.warn(`Impossible to set wet gain: reverb not present [ID: ${this.index}]`);
+	}
+};
+
+/**
+ *
+ * @param {Number} fadeTime
+ *			Fade time in seconds
+ **/
+BufferedSound.prototype.fadeOutReverb = function (fadeTime) {
+	const self = this;
+	if (!fadeTime) {
+		this.dLog && console.warn(`Missing argument fadeTime. Set to 1 second`);
+		fadeTime = 1;
+	}
+	if (self.reverb) {
+		self.wetGain.gain.setValueAtTime(self.wetGain.gain.value, self.context.currentTime);
+		self.wetGain.gain.linearRampToValueAtTime(0.0001, self.context.currentTime + fadeTime);
+		setTimeout(function () {
+			self.removeReverb();
+		}, fadeTime * 1000);
+	} else {
+		self.dLog && console.warn(`Use addReverb() before trying to remove it [ID: ${self.index}]`);
+	}
+};
+
 /**
  * @param {Object} options
  *
@@ -468,7 +560,7 @@ StreamSound.prototype.startFragmentsLoading = function () {
  * @returns {Array}
  *			Array of booleans corresponding to initialization result
  **/
-StreamSound.prototype.setEffectChain = function(options) {
+BufferedSound.prototype.setEffectChain = function (options, rvb) {
 	// Default values
 	let defaults = {
 		lpFilter: true,
@@ -508,12 +600,12 @@ StreamSound.prototype.setEffectChain = function(options) {
 	 }
 	 // Reverb is independent
 	 if (actual.reverb) {
-		 if (!this.reverberator.addReverb(actual.wetGain)) {
+		 if (!this.addReverb(rvb, actual.wetGain)) {
 			 // If reverb already present change wet gain
-			 this.reverberator.setWetGain(actual.wetGain);
+			 this.setWetGain(actual.wetGain);
 		 }
 	 } else {
-		 this.reverberator.fadeOutReverb(1.5);
+		 this.fadeOutReverb(1.5);
 	 }
 	 this.dLog && console.log(`Effect chain set [ID: ${this.index}]`);
  };
@@ -710,140 +802,6 @@ Filter.prototype.removeLowPassFilter = function () {
 			this.parent.dLog && console.warn(`Cannot remove LPfilter. Sound not filtered [ID: ${this.parent.index}]`);
 			return false;
 		}
-};
-
-
-
-// *********************************************************
-// *********************************************************
-/** REVERBERATOR
- * @param {Object} AudioContext
- *			WebAudio Context of current application
- * @param {Object} parentNode
- *			parent audio AudioNode
- **/
-function Reverberator(audioContext, parentNode) {
-	'use strict';
-	this.context = audioContext;
-	this.parent = parentNode;
-	this.seconds = 1; // TEMP hard coded
-	this.decay = 2; // TEMP hard coded
-	this.wetGain = '';
-	this.convolver = '';
-	this.reverb = false;
-	this.reverbNode = '';
-	this.reverbImpulseURL = '../shared_media/audio/reverb-impulse/AbernyteGrainSilo.m4a';
-}
-
-/**
- * @returns {Object} WebAudioAPI buffer
- *			A buffer with impulse for convolution reverb
- **/
-Reverberator.prototype.buildImpulse = function () {
-  var rate = this.context.sampleRate;
-  var length = rate * this.seconds;
-  var impulse = this.context.createBuffer(2, length, rate);
-  var impulseL = impulse.getChannelData(0);
-  var impulseR = impulse.getChannelData(1);
-  for (var i = 0; i < length; i++) {
-    impulseL[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, this.decay);
-    impulseR[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, this.decay);
-  }
-  return impulse;
-};
-
-/**
- *
- * @param {Number} wgain
- *			Gain value of wet signal
- *
- * @returns {Boolean}
- *			True if reverb added / Flase if already present
- **/
-Reverberator.prototype.addReverb = function (wgain) {
-	const self = this;
-	if (!self.reverb) {
-		if (wgain > 1) {
-			self.parent.dLog && console.warn('Gain values cannot be greater than 1');
-			wgain = 1;
-		} else if (wgain < 0) {
-			self.parent.dLog && console.warn('Gain values cannot be lower than 0');
-			wgain = 0;
-		}
-		// create gain node for adjusting wet signal
-		self.wetGain = self.context.createGain();
-		self.wetGain.gain.setTargetAtTime(wgain, self.context.currentTime, 0.5);
-		// Reverb method 1
-		self.convolver = self.context.createConvolver();
-		self.convolver.buffer = self.buildImpulse();
-		// Do connections
-		self.parent.masterGain.connect(self.convolver);
-		self.convolver.connect(self.wetGain);
-		self.wetGain.connect(self.context.destination);
-		self.reverb = true;
-		self.parent.dLog && console.log(`Reverb added [ID: ${self.parent.index}]`);
-		// Reverb method 2
-		// self.convolver = self.context.createReverbFromUrl(self.reverbImpulseURL, function () {
-		// 	self.convolver.connect(self.wetGain);
-		// 	self.wetGain.connect(self.context.destination);
-		// 	self.parent.masterGain.connect(self.convolver);
-		// 	self.reverb = true;
-		// 	this.dLog && console.log(`Reverb added [ID: ${self.parent.index}]`);
-		// });
-		return true;
-	} else {
-		self.parent.dLog && console.warn(`Reverb already present [ID: ${self.parent.index}]`);
-		return false;
-	}
-};
-
-/**
- * @param {Object} sound
- *			Sound object to remove reverb from (can be BufferedSound or StreamSound)
- * @returns {Boolean}
- *			True if reverb removed / False if not
- **/
-Reverberator.prototype.removeReverb = function () {
-		if (this.reverb) {
-			this.parent.masterGain.disconnect(this.convolver);
-			this.wetGain.disconnect(this.context.destination);
-			this.parent.dLog && console.log(`Reverb removed [ID: ${this.parent.index}]`);
-			this.reverb = false;
-			return true;
-		} else {
-			this.parent.dLog && console.warn(`Use addReverb() before trying to remove it [ID: ${this.parent.index}]`);
-			return false;
-		}
-};
-
-/**
- * @param {Number} wgain
- *			Gain value for wet signal
- **/
-Reverberator.prototype.setWetGain = function (wgain) {
-	if (this.reverb) {
-		this.wetGain.gain.setTargetAtTime(wgain, this.context.currentTime, 0.5);
-	} else {
-		this.parent.dLog && console.warn(`Impossible to set wet gain: reverb not present [ID: ${this.parent.index}]`);
-	}
-};
-
-/**
- *
- * @param {Number} secs
- *			Fade time in seconds
- **/
-Reverberator.prototype.fadeOutReverb = function (secs) {
-	const self = this;
-	if (self.reverb) {
-		self.wetGain.gain.setValueAtTime(self.wetGain.gain.value, self.context.currentTime);
-		self.wetGain.gain.linearRampToValueAtTime(0.0001, self.context.currentTime + secs);
-		setTimeout(function () {
-			self.removeReverb();
-		}, secs * 1000);
-	} else {
-		self.parent.dLog && console.warn(`Use addReverb() before trying to remove it [ID: ${self.parent.index}]`);
-	}
 };
 
 
@@ -1103,4 +1061,55 @@ Distortion.prototype.removeDistortion = function () {
 		this.parent.dLog && console.warn(`Sound not distorted [ID: ${this.parent.index}]`);
 		return false;
 	}
+};
+
+
+// *********************************************************
+// *********************************************************
+/** REVERBERATOR
+ * @param {Object} AudioContext
+ *			WebAudio Context of current application
+ **/
+function Reverberator(audioContext) {
+	'use strict';
+	this.context = audioContext;
+	this.seconds = 1; // TEMP hard coded
+	this.decay = 2; // TEMP hard coded
+	this.convolver = '';
+	this.reverbImpulseURL = '../shared_media/audio/reverb-impulse/AbernyteGrainSilo.m4a';
+	this.init();
+}
+
+Reverberator.prototype.init = function () {
+	const self = this;
+	// Reverb method 1
+	self.convolver = self.context.createConvolver();
+	self.convolver.buffer = self.buildImpulse();
+	self.convolver.connect(self.context.destination);
+	// Reverb method 2
+	// self.convolver = self.context.createReverbFromUrl(self.reverbImpulseURL, function () {
+	// 	self.convolver.connect(self.context.destination);
+	// });
+	console.log('reverb init');
+};
+
+Reverberator.prototype.disconnectReverb = function () {
+	this.convolver.disconnect();
+};
+
+/**
+ * @returns {Object} WebAudioAPI buffer
+ *			A buffer with impulse for convolution reverb
+ **/
+Reverberator.prototype.buildImpulse = function () {
+  var rate = this.context.sampleRate;
+  var length = rate * this.seconds;
+  var impulse = this.context.createBuffer(2, length, rate);
+  var impulseL = impulse.getChannelData(0);
+  var impulseR = impulse.getChannelData(1);
+  for (var i = 0; i < length; i++) {
+    impulseL[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, this.decay);
+    impulseR[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, this.decay);
+  }
+  return impulse;
 };

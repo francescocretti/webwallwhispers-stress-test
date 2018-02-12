@@ -39,7 +39,7 @@ var splsApp = splsApp === undefined ? {} : splsApp;
   s.currentAttractor = '';
   s.playingStreams = [];
   s.insideAttractors = [];
-
+  s.reverberator = '';
   s.lastActionTime = Date.now();
   s.stbyCheckId = null;
   s.insideApp = false;
@@ -47,8 +47,8 @@ var splsApp = splsApp === undefined ? {} : splsApp;
   s.audioLog = document.getElementById('audioLogs');
 
   s.bufferedFiles = [
-    'pseudostream0_10s.m4a',
-    'pseudostream1_10s.m4a',
+    'piano.mp3',
+    'snare.mp3',
     'pseudostream2_10s.m4a',
     'pseudostream3_10s.m4a',
     'pseudostream4_10s.m4a',
@@ -99,12 +99,13 @@ var splsApp = splsApp === undefined ? {} : splsApp;
       // Audio
       // Create audio context
       s.audioCtx = s.createAudioContext();
+      s.reverberator = new Reverberator(s.audioCtx);
       s.audioConfig = config.audio;
       //s.loadAudioData(config.audio);
       // Init effects
       // s.initializeEffects();
       console.log(s.getDeviceInfo());
-      console.log('Stress test version 1');
+      console.log('Stress test version 8');
     }
   };
 
@@ -447,11 +448,11 @@ var splsApp = splsApp === undefined ? {} : splsApp;
         id = `s10s${index+1}r`;
         document.getElementById(id).addEventListener('click', function () {
           var sound = el;
-          if (!sound.reverberator.reverb) {
-            sound.reverberator.addReverb(1);
+          if (!sound.reverb) {
+            sound.addReverb(s.reverberator, 1);
             this.style.backgroundColor = 'red';
           } else {
-            sound.reverberator.removeReverb();
+            sound.removeReverb();
             this.style.backgroundColor = 'white';
           }
         });
@@ -507,11 +508,11 @@ var splsApp = splsApp === undefined ? {} : splsApp;
         id = `s20s${index+1}r`;
         document.getElementById(id).addEventListener('click', function () {
           var sound = el;
-          if (!sound.reverberator.reverb) {
-            sound.reverberator.addReverb(1);
+          if (!sound.reverb) {
+            sound.addReverb(s.reverberator, 1);
             this.style.backgroundColor = 'red';
           } else {
-            sound.reverberator.removeReverb();
+            sound.removeReverb();
             this.style.backgroundColor = 'white';
           }
         });
@@ -567,11 +568,11 @@ var splsApp = splsApp === undefined ? {} : splsApp;
         id = `s60s${index+1}r`;
         document.getElementById(id).addEventListener('click', function () {
           var sound = el;
-          if (!sound.reverberator.reverb) {
-            sound.reverberator.addReverb(1);
+          if (!sound.reverb) {
+            sound.addReverb(s.reverberator, 1);
             this.style.backgroundColor = 'red';
           } else {
-            sound.reverberator.removeReverb();
+            sound.removeReverb();
             this.style.backgroundColor = 'white';
           }
         });
@@ -626,11 +627,11 @@ var splsApp = splsApp === undefined ? {} : splsApp;
         id = `s100s${index+1}r`;
         document.getElementById(id).addEventListener('click', function () {
           var sound = el;
-          if (!sound.reverberator.reverb) {
-            sound.reverberator.addReverb(1);
+          if (!sound.reverb) {
+            sound.addReverb(s.reverberator, 1);
             this.style.backgroundColor = 'red';
           } else {
-            sound.reverberator.removeReverb();
+            sound.removeReverb();
             this.style.backgroundColor = 'white';
           }
         });
@@ -686,11 +687,11 @@ var splsApp = splsApp === undefined ? {} : splsApp;
         id = `s200s${index+1}r`;
         document.getElementById(id).addEventListener('click', function () {
           var sound = el;
-          if (!sound.reverberator.reverb) {
-            sound.reverberator.addReverb(1);
+          if (!sound.reverb) {
+            sound.addReverb(s.reverberator, 1);
             this.style.backgroundColor = 'red';
           } else {
-            sound.reverberator.removeReverb();
+            sound.removeReverb();
             this.style.backgroundColor = 'white';
           }
         });
