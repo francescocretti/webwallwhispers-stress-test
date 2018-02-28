@@ -47,31 +47,19 @@ var splsApp = splsApp === undefined ? {} : splsApp;
   s.audioLog = document.getElementById('audioLogs');
 
   s.bufferedFiles = [
-    'piano.mp3',
-    'snare.mp3',
-    'pseudostream2_10s.m4a',
-    'pseudostream3_10s.m4a',
-    'pseudostream4_10s.m4a',
-    'pseudostream0_20s.m4a',
-    'pseudostream1_20s.m4a',
-    'pseudostream2_20s.m4a',
-    'pseudostream3_20s.m4a',
-    'pseudostream4_20s.m4a',
-    'pseudostream0_60s.m4a',
-    'pseudostream1_60s.m4a',
-    'pseudostream2_60s.m4a',
-    'pseudostream3_60s.m4a',
-    'pseudostream4_60s.m4a',
-    'pseudostream0_100s.m4a',
-    'pseudostream1_100s.m4a',
-    'pseudostream2_100s.m4a',
-    'pseudostream3_100s.m4a',
-    'pseudostream4_100s.m4a',
-    'pseudostream0_200s.m4a',
-    'pseudostream1_200s.m4a',
-    'pseudostream2_200s.m4a',
-    'pseudostream3_200s.m4a',
-    'pseudostream4_200s.m4a',
+    'wallSound0.m4a',
+    'wallSound1.m4a',
+    'wallSound2.m4a',
+    'wallSound3.m4a',
+    'wallSound4.m4a',
+    'wallSound5.m4a',
+    'wallSound6.m4a',
+    'wallSound7.m4a',
+    'wallSound8.m4a',
+    'wallSound9.m4a',
+    'wallSound10.m4a',
+    'wallSound11.m4a',
+    'wallSound12.m4a'
   ];
 
   /* **********
@@ -150,7 +138,7 @@ var splsApp = splsApp === undefined ? {} : splsApp;
   // ******** AUDIO ********
   s.loadAudioData = function (audioConfig, slot) {
     // Load buffers for action sounds
-    var bufferedSoundsURL = '../shared_media/audio/pseudostreams/';
+    var bufferedSoundsURL = '../shared_media/audio/aac/';
     var bufferedSounds = [];
     var callback;
     switch (slot) {
